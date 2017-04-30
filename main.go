@@ -51,6 +51,14 @@ type OktaAwsConfigFile struct {
 	path string
 }
 
+type OktaAWSConfigData struct {
+	idp_entry_url_default string
+	region_default        string
+	output_format_default string
+	cache_sid_default     string
+	cred_profile_default  string
+}
+
 // TODO: Can we use the SDK for this?
 // https://aws.amazon.com/blogs/security/a-new-and-standardized-way-to-manage-credentials-in-the-aws-sdks/
 type AWSConfigFile struct {
@@ -92,11 +100,24 @@ func getPaths() (paths, error) {
 func main() {
 	var username string
 	var profile string
+	var debug bool
+
+	// Override the default so we can use -v for verbose
+	cli.VersionFlag = cli.BoolFlag{
+		Name:  "version",
+		Usage: "print the version",
+	}
 
 	app := cli.NewApp()
 	app.Name = "okta-aws-go"
 	app.Description = "Gets a STS token to use for AWS CLI based on a SAML assertion from Okta"
 	app.Version = "0.0.1"
+	app.Authors = []cli.Author{
+		cli.Author{
+			Name:  "Fotios Lindiakos",
+			Email: "fotios@shutterstock.com",
+		},
+	}
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
@@ -110,21 +131,47 @@ func main() {
 			Usage:       "The name of the profile to use when storing the credentials in the AWS credentials file. If not provided then the name of the role assumed will be used as the profile name.",
 			Destination: &profile,
 		},
+		cli.BoolFlag{
+			Name:        "verbose, v",
+			Usage:       "If set, will print a message about the AWS CLI profile that was created.",
+			EnvVar:      "DEBUG",
+			Destination: &debug,
+		},
 	}
 
+	var creds user_creds
+	var filePaths paths
+
+	// Ensure our setup is done before the actions
+	app.Before = func(c *cli.Context) error {
+		var err error
+		creds, err = getUserCreds(username)
+		if err != nil {
+			return err
+		}
+
+		filePaths, err = getPaths()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	app.Commands = []cli.Command{
+		{
+			Name:    "configure",
+			Aliases: []string{"c"},
+			Usage:   "Configure the application",
+			Action: func(c *cli.Context) error {
+				fmt.Println("Called configure")
+				return nil
+			},
+		},
+	}
 	app.Action = func(c *cli.Context) error {
-		creds, err := getUserCreds(username)
-		if err != nil {
-			return err
+		if debug {
+			spew.Dump(creds, filePaths)
 		}
-
-		filePaths, err := getPaths()
-		if err != nil {
-			return err
-		}
-
-		spew.Dump(creds, filePaths)
-
 		return nil
 	}
 
