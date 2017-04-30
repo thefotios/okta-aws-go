@@ -6,6 +6,7 @@ import (
 	"os/user"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/spf13/viper"
 	"github.com/tcnksm/go-input"
 	"gopkg.in/urfave/cli.v1" // imports as package "cli"
 )
@@ -51,12 +52,33 @@ type OktaAwsConfigFile struct {
 	path string
 }
 
+func (c OktaAwsConfigFile) GetConfig(profile string) (OktaAWSConfigData, error) {
+	var cfg OktaAWSConfigData
+
+	vp := viper.New()
+	vp.SetConfigFile(c.path)
+
+	err := vp.ReadInConfig() // Find and read the config file
+	if err != nil {          // Handle errors reading the config file
+		panic(fmt.Errorf("Fatal error config file: %s \n", err))
+	}
+
+	// TODO: This should be able to use UnmarshallKey, but it's not working
+	cfg.cache_sid = vp.GetBool(profile + ".cache_sid")
+	cfg.idp_entry_url = vp.GetString(profile + ".idp_entry_url")
+	cfg.region = vp.GetString(profile + ".region")
+	cfg.output_format = vp.GetString(profile + ".output_format")
+	cfg.cred_profile = vp.GetString(profile + ".cred_profile")
+
+	return cfg, nil
+}
+
 type OktaAWSConfigData struct {
-	idp_entry_url_default string
-	region_default        string
-	output_format_default string
-	cache_sid_default     string
-	cred_profile_default  string
+	idp_entry_url string
+	region        string
+	output_format string
+	cache_sid     bool
+	cred_profile  string
 }
 
 // TODO: Can we use the SDK for this?
@@ -75,6 +97,7 @@ type paths struct {
 	sid_cache_file             SIDCacheFile
 }
 
+// TODO: Make these paths configurable
 func getPaths() (paths, error) {
 	// file_root: Path in which all file interaction will be relative to.
 	// Defaults to the users home dir.
@@ -87,7 +110,8 @@ func getPaths() (paths, error) {
 	return paths{
 		// okta_aws_login_config_file: The file were the config parameters for the
 		// okta_aws_login tool is stored
-		okta_aws_login_config_file: OktaAwsConfigFile{path: fileRoot + "/.okta_aws_login_config"},
+		// okta_aws_login_config_file: OktaAwsConfigFile{path: fileRoot + "/.okta_aws_login_config.yaml"},
+		okta_aws_login_config_file: OktaAwsConfigFile{path: "okta_aws_login_config.toml"},
 		// aws_config_file: The file where this script will store the temp
 		// credentials under the saml profile.
 		aws_config_file: AWSConfigFile{path: fileRoot + "/.aws/credentials"},
@@ -145,10 +169,6 @@ func main() {
 	// Ensure our setup is done before the actions
 	app.Before = func(c *cli.Context) error {
 		var err error
-		creds, err = getUserCreds(username)
-		if err != nil {
-			return err
-		}
 
 		filePaths, err = getPaths()
 		if err != nil {
@@ -169,6 +189,24 @@ func main() {
 		},
 	}
 	app.Action = func(c *cli.Context) error {
+		var err error
+
+		cfg, err := filePaths.okta_aws_login_config_file.GetConfig("core")
+		if err != nil {
+			panic(fmt.Errorf("Fatal error config file: %s \n", err))
+		}
+		if debug {
+			spew.Dump(cfg)
+		}
+
+		creds, err = getUserCreds(username)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	app.After = func(c *cli.Context) error {
 		if debug {
 			spew.Dump(creds, filePaths)
 		}
