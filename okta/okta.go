@@ -11,25 +11,24 @@ import (
 
 type Okta struct {
 	client resty.Client
+	debug  bool
 }
 
-func New(hostname string) *Okta {
+func New(hostname string, debug bool) *Okta {
 	url := url.URL{
 		Scheme: "https",
 		Host:   hostname,
 		Path:   "/api/v1",
 	}
 
-	o := Okta{}
+	o := Okta{
+		debug: debug,
+	}
 
 	o.client = *resty.New()
 	o.client.SetHostURL(url.String())
 
-	// o.client.SetDebug(true)
-	o.client.OnAfterResponse(func(c *resty.Client, resp *resty.Response) error {
-		// spew.Dump(resp)
-		return nil
-	})
+	o.client.SetDebug(debug)
 
 	return &o
 }
@@ -67,7 +66,9 @@ func (okta Okta) PasswordLogin(username, password string) (*resty.Response, erro
 		panic("Unable to convert")
 	}
 
-	spew.Dump(reply)
+	if okta.debug {
+		spew.Dump(reply)
+	}
 
 	return resp, nil
 }

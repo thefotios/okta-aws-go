@@ -75,8 +75,6 @@ func (c OktaAwsConfigFile) GetConfig(profile string) (OktaAWSConfigData, error) 
 		return cfg, fmt.Errorf("Unable to read config for %s: %s \n", profile, err)
 	}
 
-	spew.Dump(cfg)
-
 	return cfg, nil
 }
 
@@ -212,17 +210,10 @@ func main() {
 			return err
 		}
 
-		o := okta.New(cfg.OktaOrg)
+		o := okta.New(cfg.OktaOrg, debug)
 		_, err = o.PasswordLogin(creds.username, creds.password)
 		if err != nil {
 			panic(fmt.Errorf("Request error: %s \n", err))
-		}
-		return nil
-	}
-
-	app.After = func(c *cli.Context) error {
-		if debug {
-			spew.Dump(creds, filePaths)
 		}
 		return nil
 	}
