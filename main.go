@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/user"
 
+	"github.com/thefotios/okta-aws-go/okta"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/spf13/viper"
 	"github.com/tcnksm/go-input"
@@ -65,6 +67,7 @@ func (c OktaAwsConfigFile) GetConfig(profile string) (OktaAWSConfigData, error) 
 
 	// TODO: This should be able to use UnmarshallKey, but it's not working
 	cfg.cache_sid = vp.GetBool(profile + ".cache_sid")
+	cfg.okta_org = vp.GetString(profile + ".okta_org")
 	cfg.idp_entry_url = vp.GetString(profile + ".idp_entry_url")
 	cfg.region = vp.GetString(profile + ".region")
 	cfg.output_format = vp.GetString(profile + ".output_format")
@@ -74,6 +77,7 @@ func (c OktaAwsConfigFile) GetConfig(profile string) (OktaAWSConfigData, error) 
 }
 
 type OktaAWSConfigData struct {
+	okta_org      string
 	idp_entry_url string
 	region        string
 	output_format string
@@ -202,6 +206,12 @@ func main() {
 		creds, err = getUserCreds(username)
 		if err != nil {
 			return err
+		}
+
+		o := okta.New(cfg.okta_org)
+		_, err = o.PasswordLogin(creds.username, creds.password)
+		if err != nil {
+			panic(fmt.Errorf("Request error: %s \n", err))
 		}
 		return nil
 	}
