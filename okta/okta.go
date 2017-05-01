@@ -2,6 +2,7 @@ package okta
 
 import (
 	"net/url"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -24,12 +25,22 @@ func New(hostname string) *Okta {
 	o.client = *resty.New()
 	o.client.SetHostURL(url.String())
 
+	// o.client.SetDebug(true)
 	o.client.OnAfterResponse(func(c *resty.Client, resp *resty.Response) error {
-		spew.Dump(resp)
+		// spew.Dump(resp)
 		return nil
 	})
 
 	return &o
+}
+
+type AuthenticationTransactionModel struct {
+	StateToken   string    `json:"stateToken"`
+	SessionToken string    `json:"sessionToken"`
+	ExpiresAt    time.Time `json:"expiresAt"`
+	Status       string    `json:"status"`
+	RelayState   string    `json:"relayState"`
+	FactorResult string    `json:"factorResult"`
 }
 
 // https://github.com/oktadeveloper/okta-aws-cli-assume-role/blob/master/src/main/java/com/okta/tools/awscli.java#L179
@@ -44,11 +55,19 @@ func (okta Okta) PasswordLogin(username, password string) (*resty.Response, erro
 			"username": username,
 			"password": password,
 		}).
+		SetResult(&AuthenticationTransactionModel{}).
 		Post("/authn")
 
 	if err != nil {
 		return &resty.Response{}, err
 	}
+
+	reply, ok := resp.Result().(*AuthenticationTransactionModel)
+	if !ok {
+		panic("Unable to convert")
+	}
+
+	spew.Dump(reply)
 
 	return resp, nil
 }

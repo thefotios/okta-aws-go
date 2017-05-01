@@ -60,29 +60,33 @@ func (c OktaAwsConfigFile) GetConfig(profile string) (OktaAWSConfigData, error) 
 	vp := viper.New()
 	vp.SetConfigFile(c.path)
 
-	err := vp.ReadInConfig() // Find and read the config file
-	if err != nil {          // Handle errors reading the config file
-		panic(fmt.Errorf("Fatal error config file: %s \n", err))
+	err := vp.ReadInConfig()
+	if err != nil {
+		return cfg, fmt.Errorf("Fatal error config file: %s \n", err)
 	}
 
-	// TODO: This should be able to use UnmarshallKey, but it's not working
-	cfg.cache_sid = vp.GetBool(profile + ".cache_sid")
-	cfg.okta_org = vp.GetString(profile + ".okta_org")
-	cfg.idp_entry_url = vp.GetString(profile + ".idp_entry_url")
-	cfg.region = vp.GetString(profile + ".region")
-	cfg.output_format = vp.GetString(profile + ".output_format")
-	cfg.cred_profile = vp.GetString(profile + ".cred_profile")
+	ok := vp.IsSet(profile)
+	if !ok {
+		return cfg, fmt.Errorf("Profile not set for %s", profile)
+	}
+
+	err = vp.UnmarshalKey(profile, &cfg)
+	if err != nil { // Handle errors reading the config file
+		return cfg, fmt.Errorf("Unable to read config for %s: %s \n", profile, err)
+	}
+
+	spew.Dump(cfg)
 
 	return cfg, nil
 }
 
 type OktaAWSConfigData struct {
-	okta_org      string
-	idp_entry_url string
-	region        string
-	output_format string
-	cache_sid     bool
-	cred_profile  string
+	OktaOrg      string
+	IdpEntryURL  string
+	Region       string
+	OutputFormat string
+	CacheSid     bool
+	CredProfile  string
 }
 
 // TODO: Can we use the SDK for this?
@@ -208,7 +212,7 @@ func main() {
 			return err
 		}
 
-		o := okta.New(cfg.okta_org)
+		o := okta.New(cfg.OktaOrg)
 		_, err = o.PasswordLogin(creds.username, creds.password)
 		if err != nil {
 			panic(fmt.Errorf("Request error: %s \n", err))
